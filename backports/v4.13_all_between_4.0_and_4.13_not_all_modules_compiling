@@ -1,0 +1,634 @@
+diff -ur ../../media_build_experimental/linux/drivers/media/common/saa7146/saa7146_vbi.c ./drivers/media/common/saa7146/saa7146_vbi.c
+--- ../../media_build_experimental/linux/drivers/media/common/saa7146/saa7146_vbi.c	2015-03-04 05:45:10.000000000 +0100
++++ ./drivers/media/common/saa7146/saa7146_vbi.c	2017-12-26 14:10:48.854647158 +0100
+@@ -1,4 +1,4 @@
+-#include <media/saa7146_vv.h>
++#include <media/drv-intf/saa7146_vv.h>
+ 
+ static int vbi_pixel_to_capture = 720 * 2;
+ 
+diff -ur ../../media_build_experimental/linux/drivers/media/dvb-core/dvb_ca_en50221.c ./drivers/media/dvb-core/dvb_ca_en50221.c
+--- ../../media_build_experimental/linux/drivers/media/dvb-core/dvb_ca_en50221.c	2017-12-26 15:00:45.583616558 +0100
++++ ./drivers/media/dvb-core/dvb_ca_en50221.c	2017-12-26 13:48:10.954776884 +0100
+@@ -35,7 +35,7 @@
+ #include <linux/vmalloc.h>
+ #include <linux/delay.h>
+ #include <linux/spinlock.h>
+-#include <linux/sched.h>
++#include <linux/sched/signal.h>
+ #include <linux/kthread.h>
+ 
+ #include "dvb_ca_en50221.h"
+diff -ur ../../media_build_experimental/linux/drivers/media/dvb-core/dvb_demux.c ./drivers/media/dvb-core/dvb_demux.c
+--- ../../media_build_experimental/linux/drivers/media/dvb-core/dvb_demux.c	2017-12-26 15:00:46.739604037 +0100
++++ ./drivers/media/dvb-core/dvb_demux.c	2017-12-26 13:13:16.380525964 +0100
+@@ -21,7 +21,7 @@
+  *
+  */
+ 
+-#include <linux/sched.h>
++#include <linux/sched/signal.h>
+ #include <linux/spinlock.h>
+ #include <linux/slab.h>
+ #include <linux/vmalloc.h>
+diff -ur ../../media_build_experimental/linux/drivers/media/dvb-core/dvb_frontend.c ./drivers/media/dvb-core/dvb_frontend.c
+--- ../../media_build_experimental/linux/drivers/media/dvb-core/dvb_frontend.c	2017-12-26 15:00:46.743603995 +0100
++++ ./drivers/media/dvb-core/dvb_frontend.c	2017-12-26 13:48:40.978476557 +0100
+@@ -30,7 +30,7 @@
+ 
+ #include <linux/string.h>
+ #include <linux/kernel.h>
+-#include <linux/sched.h>
++#include <linux/sched/signal.h>
+ #include <linux/wait.h>
+ #include <linux/slab.h>
+ #include <linux/poll.h>
+diff -ur ../../media_build_experimental/linux/drivers/media/dvb-core/dvb_ringbuffer.c ./drivers/media/dvb-core/dvb_ringbuffer.c
+--- ../../media_build_experimental/linux/drivers/media/dvb-core/dvb_ringbuffer.c	2014-09-09 05:45:14.000000000 +0200
++++ ./drivers/media/dvb-core/dvb_ringbuffer.c	2017-12-26 13:47:31.067172158 +0100
+@@ -31,7 +31,7 @@
+ #include <linux/module.h>
+ #include <linux/sched.h>
+ #include <linux/string.h>
+-#include <asm/uaccess.h>
++#include <linux/uaccess.h>
+ 
+ #include "dvb_ringbuffer.h"
+ 
+diff -ur ../../media_build_experimental/linux/drivers/media/i2c/cx25840/cx25840-core.h ./drivers/media/i2c/cx25840/cx25840-core.h
+--- ../../media_build_experimental/linux/drivers/media/i2c/cx25840/cx25840-core.h	2015-02-27 05:45:20.000000000 +0100
++++ ./drivers/media/i2c/cx25840/cx25840-core.h	2017-12-26 16:47:14.258723839 +0100
+@@ -69,6 +69,7 @@
+ 	enum cx25840_model id;
+ 	u32 rev;
+ 	int is_initialized;
++	unsigned vbi_regs_offset;
+ 	wait_queue_head_t fw_wait;    /* wake up when the fw load is finished */
+ 	struct work_struct fw_work;   /* work entry for fw load */
+ 	struct cx25840_ir_state *ir_state;
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/cx23885/cx23885-core.c ./drivers/media/pci/cx23885/cx23885-core.c
+--- ../../media_build_experimental/linux/drivers/media/pci/cx23885/cx23885-core.c	2015-04-09 05:45:08.000000000 +0200
++++ ./drivers/media/pci/cx23885/cx23885-core.c	2017-12-26 20:14:16.968406544 +0100
+@@ -1990,9 +1990,9 @@
+ 		(unsigned long long)pci_resource_start(pci_dev, 0));
+ 
+ 	pci_set_master(pci_dev);
+-	if (!pci_dma_supported(pci_dev, 0xffffffff)) {
+-		printk("%s/0: Oops: no 32bit PCI DMA ???\n", dev->name);
+-		err = -EIO;
++	err = pci_set_dma_mask(pci_dev, 0xffffffff);
++	if (err) {
++		pr_err("%s/0: Oops: no 32bit PCI DMA ???\n", dev->name);
+ 		goto fail_context;
+ 	}
+ 
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/cx25821/cx25821-core.c ./drivers/media/pci/cx25821/cx25821-core.c
+--- ../../media_build_experimental/linux/drivers/media/pci/cx25821/cx25821-core.c	2017-12-26 15:00:59.167469325 +0100
++++ ./drivers/media/pci/cx25821/cx25821-core.c	2017-12-26 20:17:25.530389127 +0100
+@@ -1320,7 +1320,8 @@
+ 		dev->pci_lat, (unsigned long long)dev->base_io_addr);
+ 
+ 	pci_set_master(pci_dev);
+-	if (!pci_dma_supported(pci_dev, 0xffffffff)) {
++	err = pci_set_dma_mask(pci_dev, 0xffffffff);
++	if (err) {
+ 		pr_err("%s/0: Oops: no 32bit PCI DMA ???\n", dev->name);
+ 		err = -EIO;
+ 		goto fail_irq;
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/cx88/cx88-alsa.c ./drivers/media/pci/cx88/cx88-alsa.c
+--- ../../media_build_experimental/linux/drivers/media/pci/cx88/cx88-alsa.c	2014-11-04 05:45:07.000000000 +0100
++++ ./drivers/media/pci/cx88/cx88-alsa.c	2017-12-26 20:21:53.211532823 +0100
+@@ -890,7 +890,8 @@
+ 		return err;
+ 	}
+ 
+-	if (!pci_dma_supported(pci,DMA_BIT_MASK(32))) {
++	err = pci_set_dma_mask(pci, DMA_BIT_MASK(32));
++	if (err) {
+ 		dprintk(0, "%s/1: Oops: no 32bit PCI DMA ???\n",core->name);
+ 		err = -EIO;
+ 		cx88_core_put(core, pci);
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/cx88/cx88-mpeg.c ./drivers/media/pci/cx88/cx88-mpeg.c
+--- ../../media_build_experimental/linux/drivers/media/pci/cx88/cx88-mpeg.c	2015-05-02 05:45:27.000000000 +0200
++++ ./drivers/media/pci/cx88/cx88-mpeg.c	2017-12-26 20:23:18.502624032 +0100
+@@ -393,8 +393,9 @@
+ 	if (pci_enable_device(dev->pci))
+ 		return -EIO;
+ 	pci_set_master(dev->pci);
+-	if (!pci_dma_supported(dev->pci,DMA_BIT_MASK(32))) {
+-		printk("%s/2: Oops: no 32bit PCI DMA ???\n",dev->core->name);
++	err = pci_set_dma_mask(dev->pci, DMA_BIT_MASK(32));
++	if (err) {
++		pr_err("Oops: no 32bit PCI DMA ???\n");
+ 		return -EIO;
+ 	}
+ 
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/cx88/cx88-video.c ./drivers/media/pci/cx88/cx88-video.c
+--- ../../media_build_experimental/linux/drivers/media/pci/cx88/cx88-video.c	2015-05-02 05:45:27.000000000 +0200
++++ ./drivers/media/pci/cx88/cx88-video.c	2017-12-26 20:22:54.854875953 +0100
+@@ -1311,8 +1311,9 @@
+ 	       dev->pci_lat,(unsigned long long)pci_resource_start(pci_dev,0));
+ 
+ 	pci_set_master(pci_dev);
+-	if (!pci_dma_supported(pci_dev,DMA_BIT_MASK(32))) {
+-		printk("%s/0: Oops: no 32bit PCI DMA ???\n",core->name);
++	err = pci_set_dma_mask(pci_dev, DMA_BIT_MASK(32));
++	if (err) {
++		pr_err("Oops: no 32bit PCI DMA ???\n");
+ 		err = -EIO;
+ 		goto fail_core;
+ 	}
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/ddbridge/ddbridge.c ./drivers/media/pci/ddbridge/ddbridge.c
+--- ../../media_build_experimental/linux/drivers/media/pci/ddbridge/ddbridge.c	2017-12-26 15:00:45.571616688 +0100
++++ ./drivers/media/pci/ddbridge/ddbridge.c	2017-12-26 15:24:52.828001609 +0100
+@@ -162,7 +162,7 @@
+ #ifdef CONFIG_PCI_MSI
+ 	if (msi && pci_msi_enabled()) {
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0))
+-		stat = pci_enable_msi_range(dev->pdev, 1, 2);
++		stat = pci_alloc_irq_vectors(dev->pdev, 1, 2, PCI_IRQ_MSI);
+ 		if (stat >= 1) {
+ 			dev->msi = stat;
+ 			pr_info("DDBridge: using %d MSI interrupt(s)\n", dev->msi);
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/ngene/ngene-cards.c ./drivers/media/pci/ngene/ngene-cards.c
+--- ../../media_build_experimental/linux/drivers/media/pci/ngene/ngene-cards.c	2017-12-26 15:00:45.571616688 +0100
++++ ./drivers/media/pci/ngene/ngene-cards.c	2017-12-26 14:31:17.493709470 +0100
+@@ -1313,12 +1313,6 @@
+ 	return PCI_ERS_RESULT_CAN_RECOVER;
+ }
+ 
+-static pci_ers_result_t ngene_link_reset(struct pci_dev *dev)
+-{
+-	printk(KERN_INFO DEVICE_NAME ": link reset\n");
+-	return 0;
+-}
+-
+ static pci_ers_result_t ngene_slot_reset(struct pci_dev *dev)
+ {
+ 	printk(KERN_INFO DEVICE_NAME ": slot reset\n");
+@@ -1332,7 +1326,6 @@
+ 
+ static struct pci_error_handlers ngene_errors = {
+ 	.error_detected = ngene_error_detected,
+-	.link_reset = ngene_link_reset,
+ 	.slot_reset = ngene_slot_reset,
+ 	.resume = ngene_resume,
+ };
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/pt1/pt1.c ./drivers/media/pci/pt1/pt1.c
+--- ../../media_build_experimental/linux/drivers/media/pci/pt1/pt1.c	2014-11-04 05:45:07.000000000 +0100
++++ ./drivers/media/pci/pt1/pt1.c	2017-12-26 14:24:06.963204833 +0100
+@@ -22,6 +22,7 @@
+  */
+ 
+ #include <linux/kernel.h>
++#include <linux/sched/signal.h>
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/vmalloc.h>
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/pt3/pt3.c ./drivers/media/pci/pt3/pt3.c
+--- ../../media_build_experimental/linux/drivers/media/pci/pt3/pt3.c	2014-11-04 05:45:07.000000000 +0100
++++ ./drivers/media/pci/pt3/pt3.c	2017-12-26 14:25:07.966411425 +0100
+@@ -17,6 +17,7 @@
+ #include <linux/freezer.h>
+ #include <linux/kernel.h>
+ #include <linux/kthread.h>
++#include <linux/sched/signal.h>
+ #include <linux/mutex.h>
+ #include <linux/module.h>
+ #include <linux/pci.h>
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/saa7134/saa7134-core.c ./drivers/media/pci/saa7134/saa7134-core.c
+--- ../../media_build_experimental/linux/drivers/media/pci/saa7134/saa7134-core.c	2014-11-26 05:45:10.000000000 +0100
++++ ./drivers/media/pci/saa7134/saa7134-core.c	2017-12-26 20:19:46.156887677 +0100
+@@ -948,8 +948,9 @@
+ 	       pci_name(pci_dev), dev->pci_rev, pci_dev->irq,
+ 	       dev->pci_lat,(unsigned long long)pci_resource_start(pci_dev,0));
+ 	pci_set_master(pci_dev);
+-	if (!pci_dma_supported(pci_dev, DMA_BIT_MASK(32))) {
+-		printk("%s: Oops: no 32bit PCI DMA ???\n",dev->name);
++	err = pci_set_dma_mask(pci_dev, DMA_BIT_MASK(32));
++	if (err) {
++		pr_warn("%s: Oops: no 32bit PCI DMA ???\n", dev->name);
+ 		err = -EIO;
+ 		goto fail1;
+ 	}
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/saa7164/saa7164-core.c ./drivers/media/pci/saa7164/saa7164-core.c
+--- ../../media_build_experimental/linux/drivers/media/pci/saa7164/saa7164-core.c	2015-05-02 05:45:27.000000000 +0200
++++ ./drivers/media/pci/saa7164/saa7164-core.c	2017-12-26 20:20:55.536147674 +0100
+@@ -1226,7 +1226,8 @@
+ 
+ 	pci_set_master(pci_dev);
+ 	/* TODO */
+-	if (!pci_dma_supported(pci_dev, 0xffffffff)) {
++	err = pci_set_dma_mask(pci_dev, 0xffffffff);
++	if (err) {
+ 		printk("%s/0: Oops: no 32bit PCI DMA ???\n", dev->name);
+ 		err = -EIO;
+ 		goto fail_irq;
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/saa716x/saa716x_pci.c ./drivers/media/pci/saa716x/saa716x_pci.c
+--- ../../media_build_experimental/linux/drivers/media/pci/saa716x/saa716x_pci.c	2017-12-26 15:00:46.699604471 +0100
++++ ./drivers/media/pci/saa716x/saa716x_pci.c	2017-12-26 15:33:36.582325269 +0100
+@@ -44,7 +44,8 @@
+ 	for (i = 0; i < SAA716x_MSI_MAX_VECTORS; i++)
+ 		saa716x->msix_entries[i].entry = i;
+ 
+-	ret = pci_enable_msix(pdev, saa716x->msix_entries, SAA716x_MSI_MAX_VECTORS);
++	ret = pci_alloc_irq_vectors(pdev, saa716x->msix_entries, SAA716x_MSI_MAX_VECTORS,
++			PCI_IRQ_MSIX | PCI_IRQ_AFFINITY);
+ 	if (ret < 0)
+ 		dprintk(SAA716x_ERROR, 1, "MSI-X request failed <%d>", ret);
+ 	if (ret > 0)
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/tw68/tw68-core.c ./drivers/media/pci/tw68/tw68-core.c
+--- ../../media_build_experimental/linux/drivers/media/pci/tw68/tw68-core.c	2014-11-26 05:45:10.000000000 +0100
++++ ./drivers/media/pci/tw68/tw68-core.c	2017-12-26 20:18:42.561566401 +0100
+@@ -256,7 +256,8 @@
+ 		dev->name, pci_name(pci_dev), dev->pci_rev, pci_dev->irq,
+ 		dev->pci_lat, (u64)pci_resource_start(pci_dev, 0));
+ 	pci_set_master(pci_dev);
+-	if (!pci_dma_supported(pci_dev, DMA_BIT_MASK(32))) {
++	err = pci_set_dma_mask(pci_dev, DMA_BIT_MASK(32));
++	if (err) {
+ 		pr_info("%s: Oops: no 32bit PCI DMA ???\n", dev->name);
+ 		err = -EIO;
+ 		goto fail1;
+diff -ur ../../media_build_experimental/linux/drivers/media/pci/zoran/zoran_device.c ./drivers/media/pci/zoran/zoran_device.c
+--- ../../media_build_experimental/linux/drivers/media/pci/zoran/zoran_device.c	2015-05-02 05:45:27.000000000 +0200
++++ ./drivers/media/pci/zoran/zoran_device.c	2017-12-26 14:55:44.038817927 +0100
+@@ -31,6 +31,7 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/vmalloc.h>
++#include <linux/sched/signal.h>
+ 
+ #include <linux/interrupt.h>
+ #include <linux/proc_fs.h>
+diff -ur ../../media_build_experimental/linux/drivers/media/platform/vivid/vivid-radio-rx.c ./drivers/media/platform/vivid/vivid-radio-rx.c
+--- ../../media_build_experimental/linux/drivers/media/platform/vivid/vivid-radio-rx.c	2015-05-02 05:45:27.000000000 +0200
++++ ./drivers/media/platform/vivid/vivid-radio-rx.c	2017-12-26 14:23:00.628075110 +0100
+@@ -22,6 +22,7 @@
+ #include <linux/delay.h>
+ #include <linux/videodev2.h>
+ #include <linux/v4l2-dv-timings.h>
++#include <linux/sched/signal.h>
+ #include <media/v4l2-common.h>
+ #include <media/v4l2-event.h>
+ #include <media/v4l2-dv-timings.h>
+diff -ur ../../media_build_experimental/linux/drivers/media/platform/vivid/vivid-radio-tx.c ./drivers/media/platform/vivid/vivid-radio-tx.c
+--- ../../media_build_experimental/linux/drivers/media/platform/vivid/vivid-radio-tx.c	2014-09-03 05:45:14.000000000 +0200
++++ ./drivers/media/platform/vivid/vivid-radio-tx.c	2017-12-26 14:23:20.851808896 +0100
+@@ -19,6 +19,7 @@
+ 
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
++#include <linux/sched/signal.h>
+ #include <linux/delay.h>
+ #include <linux/videodev2.h>
+ #include <linux/v4l2-dv-timings.h>
+diff -ur ../../media_build_experimental/linux/drivers/media/rc/lirc_dev.c ./drivers/media/rc/lirc_dev.c
+--- ../../media_build_experimental/linux/drivers/media/rc/lirc_dev.c	2015-02-04 05:45:05.000000000 +0100
++++ ./drivers/media/rc/lirc_dev.c	2017-12-26 14:05:38.223525447 +0100
+@@ -21,7 +21,7 @@
+ 
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+-#include <linux/sched.h>
++#include <linux/sched/signal.h>
+ #include <linux/errno.h>
+ #include <linux/ioctl.h>
+ #include <linux/fs.h>
+diff -ur ../../media_build_experimental/linux/drivers/media/usb/cpia2/cpia2_core.c ./drivers/media/usb/cpia2/cpia2_core.c
+--- ../../media_build_experimental/linux/drivers/media/usb/cpia2/cpia2_core.c	2014-07-26 19:44:52.000000000 +0200
++++ ./drivers/media/usb/cpia2/cpia2_core.c	2017-12-26 19:54:06.785669170 +0100
+@@ -36,6 +36,7 @@
+ #include <linux/mm.h>
+ #include <linux/vmalloc.h>
+ #include <linux/firmware.h>
++#include <linux/sched/signal.h>
+ 
+ #define FIRMWARE "cpia2/stv0672_vp4.bin"
+ MODULE_FIRMWARE(FIRMWARE);
+diff -ur ../../media_build_experimental/linux/drivers/media/usb/gspca/cpia1.c ./drivers/media/usb/gspca/cpia1.c
+--- ../../media_build_experimental/linux/drivers/media/usb/gspca/cpia1.c	2017-12-26 15:00:59.171469280 +0100
++++ ./drivers/media/usb/gspca/cpia1.c	2017-12-26 19:52:19.738987773 +0100
+@@ -32,6 +32,7 @@
+ #define MODULE_NAME "cpia1"
+ 
+ #include <linux/input.h>
++#include <linux/sched/signal.h>
+ #include "gspca.h"
+ 
+ MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
+diff -ur ../../media_build_experimental/linux/drivers/media/usb/pvrusb2/pvrusb2-ioread.c ./drivers/media/usb/pvrusb2/pvrusb2-ioread.c
+--- ../../media_build_experimental/linux/drivers/media/usb/pvrusb2/pvrusb2-ioread.c	2015-05-02 05:45:27.000000000 +0200
++++ ./drivers/media/usb/pvrusb2/pvrusb2-ioread.c	2017-12-26 19:57:32.183298558 +0100
+@@ -25,7 +25,7 @@
+ #include <linux/mm.h>
+ #include <linux/slab.h>
+ #include <linux/mutex.h>
+-#include <asm/uaccess.h>
++#include <linux/uaccess.h>
+ 
+ #define BUFFER_COUNT 32
+ #define BUFFER_SIZE PAGE_ALIGN(0x4000)
+diff -ur ../../media_build_experimental/linux/drivers/media/v4l2-core/videobuf2-dma-contig.c ./drivers/media/v4l2-core/videobuf2-dma-contig.c
+--- ../../media_build_experimental/linux/drivers/media/v4l2-core/videobuf2-dma-contig.c	2015-05-02 05:45:27.000000000 +0200
++++ ./drivers/media/v4l2-core/videobuf2-dma-contig.c	2017-12-26 14:02:40.933495394 +0100
+@@ -489,9 +489,12 @@
+ 		}
+ 	} else {
+ 		int n;
++		unsigned int gup_flags = FOLL_FORCE;
++		
++		if (dma_dir == DMA_FROM_DEVICE)
++			gup_flags |= FOLL_WRITE;
+ 
+-		n = get_user_pages(current, current->mm, start & PAGE_MASK,
+-			n_pages, dma_dir == DMA_FROM_DEVICE, 1, pages, NULL);
++		n = get_user_pages(start & PAGE_MASK, n_pages, gup_flags, pages, NULL);
+ 		/* negative error means that no page was pinned */
+ 		n = max(n, 0);
+ 		if (n != n_pages) {
+@@ -517,15 +520,12 @@
+ 	struct sg_table *sgt = buf->dma_sgt;
+ 
+ 	if (sgt) {
+-		DEFINE_DMA_ATTRS(attrs);
+-
+-		dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
+ 		/*
+ 		 * No need to sync to CPU, it's already synced to the CPU
+ 		 * since the finish() memop will have been called before this.
+ 		 */
+ 		dma_unmap_sg_attrs(buf->dev, sgt->sgl, sgt->orig_nents,
+-				   buf->dma_dir, &attrs);
++				   buf->dma_dir, DMA_ATTR_SKIP_CPU_SYNC);
+ 		if (!vma_is_io(buf->vma))
+ 			vb2_dc_sgt_foreach_page(sgt, vb2_dc_put_dirty_page);
+ 
+@@ -584,9 +584,6 @@
+ 	struct sg_table *sgt;
+ 	unsigned long contig_size;
+ 	unsigned long dma_align = dma_get_cache_alignment();
+-	DEFINE_DMA_ATTRS(attrs);
+-
+-	dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
+ 
+ 	/* Only cache aligned DMA transfers are reliable */
+ 	if (!IS_ALIGNED(vaddr | size, dma_align)) {
+@@ -680,7 +677,7 @@
+ 	 * prepare() memop is called.
+ 	 */
+ 	sgt->nents = dma_map_sg_attrs(buf->dev, sgt->sgl, sgt->orig_nents,
+-				      buf->dma_dir, &attrs);
++				      buf->dma_dir, DMA_ATTR_SKIP_CPU_SYNC);
+ 	if (sgt->nents <= 0) {
+ 		pr_err("failed to map scatterlist\n");
+ 		ret = -EIO;
+@@ -703,7 +700,7 @@
+ 
+ fail_map_sg:
+ 	dma_unmap_sg_attrs(buf->dev, sgt->sgl, sgt->orig_nents,
+-			   buf->dma_dir, &attrs);
++			   buf->dma_dir, DMA_ATTR_SKIP_CPU_SYNC);
+ 
+ fail_sgt_init:
+ 	if (!vma_is_io(buf->vma))
+diff -ur ../../media_build_experimental/linux/drivers/media/v4l2-core/videobuf2-dma-sg.c ./drivers/media/v4l2-core/videobuf2-dma-sg.c
+--- ../../media_build_experimental/linux/drivers/media/v4l2-core/videobuf2-dma-sg.c	2015-05-02 05:45:27.000000000 +0200
++++ ./drivers/media/v4l2-core/videobuf2-dma-sg.c	2017-12-26 14:05:09.175849054 +0100
+@@ -107,9 +107,6 @@
+ 	struct sg_table *sgt;
+ 	int ret;
+ 	int num_pages;
+-	DEFINE_DMA_ATTRS(attrs);
+-
+-	dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
+ 
+ 	if (WARN_ON(alloc_ctx == NULL))
+ 		return NULL;
+@@ -148,7 +145,7 @@
+ 	 * prepare() memop is called.
+ 	 */
+ 	if (dma_map_sg_attrs(buf->dev, sgt->sgl, sgt->nents,
+-			     buf->dma_dir, &attrs) == 0)
++			     buf->dma_dir, DMA_ATTR_SKIP_CPU_SYNC) == 0)
+ 		goto fail_map;
+ 
+ 	buf->handler.refcount = &buf->refcount;
+@@ -182,13 +179,10 @@
+ 	int i = buf->num_pages;
+ 
+ 	if (atomic_dec_and_test(&buf->refcount)) {
+-		DEFINE_DMA_ATTRS(attrs);
+-
+-		dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
+ 		dprintk(1, "%s: Freeing buffer of %d pages\n", __func__,
+ 			buf->num_pages);
+ 		dma_unmap_sg_attrs(buf->dev, sgt->sgl, sgt->nents,
+-				   buf->dma_dir, &attrs);
++				   buf->dma_dir, DMA_ATTR_SKIP_CPU_SYNC);
+ 		if (buf->vaddr)
+ 			vm_unmap_ram(buf->vaddr, buf->num_pages);
+ 		sg_free_table(buf->dma_sgt);
+@@ -239,9 +233,6 @@
+ 	int num_pages_from_user;
+ 	struct vm_area_struct *vma;
+ 	struct sg_table *sgt;
+-	DEFINE_DMA_ATTRS(attrs);
+-
+-	dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
+ 
+ 	buf = kzalloc(sizeof *buf, GFP_KERNEL);
+ 	if (!buf)
+@@ -294,14 +285,17 @@
+ 			}
+ 			buf->pages[num_pages_from_user] = pfn_to_page(pfn);
+ 		}
+-	} else
+-		num_pages_from_user = get_user_pages(current, current->mm,
+-					     vaddr & PAGE_MASK,
++	} else {
++		unsigned int gup_flags = FOLL_FORCE;
++		if (buf->dma_dir == DMA_FROM_DEVICE)
++			gup_flags |= FOLL_WRITE;
++
++		num_pages_from_user = get_user_pages(vaddr & PAGE_MASK,
+ 					     buf->num_pages,
+-					     buf->dma_dir == DMA_FROM_DEVICE,
+-					     1, /* force */
++					     gup_flags,
+ 					     buf->pages,
+ 					     NULL);
++	}
+ 	up_read(&current->mm->mmap_sem);
+ 
+ 	if (num_pages_from_user != buf->num_pages)
+@@ -317,7 +311,7 @@
+ 	 * prepare() memop is called.
+ 	 */
+ 	if (dma_map_sg_attrs(buf->dev, sgt->sgl, sgt->nents,
+-			     buf->dma_dir, &attrs) == 0)
++			     buf->dma_dir, DMA_ATTR_SKIP_CPU_SYNC) == 0)
+ 		goto userptr_fail_map;
+ 	return buf;
+ 
+@@ -349,13 +343,11 @@
+ 	struct vb2_dma_sg_buf *buf = buf_priv;
+ 	struct sg_table *sgt = &buf->sg_table;
+ 	int i = buf->num_pages;
+-	DEFINE_DMA_ATTRS(attrs);
+-
+-	dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
+ 
+ 	dprintk(1, "%s: Releasing userspace buffer of %d pages\n",
+ 	       __func__, buf->num_pages);
+-	dma_unmap_sg_attrs(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir, &attrs);
++	dma_unmap_sg_attrs(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir,
++			   DMA_ATTR_SKIP_CPU_SYNC);
+ 	if (buf->vaddr)
+ 		vm_unmap_ram(buf->vaddr, buf->num_pages);
+ 	sg_free_table(buf->dma_sgt);
+diff -ur ../../media_build_experimental/linux/drivers/media/v4l2-core/videobuf2-vmalloc.c ./drivers/media/v4l2-core/videobuf2-vmalloc.c
+--- ../../media_build_experimental/linux/drivers/media/v4l2-core/videobuf2-vmalloc.c	2015-05-02 05:45:27.000000000 +0200
++++ ./drivers/media/v4l2-core/videobuf2-vmalloc.c	2017-12-26 12:23:46.352902675 +0100
+@@ -99,6 +99,8 @@
+ 		if (!buf->vaddr)
+ 			goto fail_pages_array_alloc;
+ 	} else {
++		unsigned int gup_flags = FOLL_FORCE;
++
+ 		first = vaddr >> PAGE_SHIFT;
+ 		last  = (vaddr + size - 1) >> PAGE_SHIFT;
+ 		buf->n_pages = last - first + 1;
+@@ -107,12 +109,12 @@
+ 		if (!buf->pages)
+ 			goto fail_pages_array_alloc;
+ 
++		if (buf->dma_dir == DMA_FROM_DEVICE)
++			gup_flags |= FOLL_WRITE;
++
+ 		/* current->mm->mmap_sem is taken by videobuf2 core */
+-		n_pages = get_user_pages(current, current->mm,
+-					 vaddr & PAGE_MASK, buf->n_pages,
+-					 dma_dir == DMA_FROM_DEVICE,
+-					 1, /* force */
+-					 buf->pages, NULL);
++		n_pages = get_user_pages(vaddr & PAGE_MASK, buf->n_pages,
++					 gup_flags, buf->pages, NULL);
+ 		if (n_pages != buf->n_pages)
+ 			goto fail_get_user_pages;
+ 
+diff -ur ../../media_build_experimental/linux/drivers/media/v4l2-core/videobuf-dma-sg.c ./drivers/media/v4l2-core/videobuf-dma-sg.c
+--- ../../media_build_experimental/linux/drivers/media/v4l2-core/videobuf-dma-sg.c	2015-01-28 05:45:08.000000000 +0100
++++ ./drivers/media/v4l2-core/videobuf-dma-sg.c	2017-12-26 14:15:46.450056913 +0100
+@@ -156,6 +156,7 @@
+ {
+ 	unsigned long first, last;
+ 	int err, rw = 0;
++	unsigned int flags = FOLL_FORCE;
+ 
+ 	dma->direction = direction;
+ 	switch (dma->direction) {
+@@ -178,17 +179,19 @@
+ 	if (NULL == dma->pages)
+ 		return -ENOMEM;
+ 
++	if (rw == READ)
++		flags |= FOLL_WRITE;
++
+ 	dprintk(1, "init user [0x%lx+0x%lx => %d pages]\n",
+ 		data, size, dma->nr_pages);
+ 
+-	err = get_user_pages(current, current->mm,
+-			     data & PAGE_MASK, dma->nr_pages,
+-			     rw == READ, 1, /* force */
+-			     dma->pages, NULL);
++	err = get_user_pages(data & PAGE_MASK, dma->nr_pages,
++			     flags, dma->pages, NULL);
+ 
+ 	if (err != dma->nr_pages) {
+ 		dma->nr_pages = (err >= 0) ? err : 0;
+-		dprintk(1, "get_user_pages: err=%d [%d]\n", err, dma->nr_pages);
++		dprintk(1, "get_user_pages: err=%d [%d]\n", err,
++			dma->nr_pages);
+ 		return err < 0 ? err : -EINVAL;
+ 	}
+ 	return 0;
+@@ -350,7 +353,7 @@
+ 
+ 	if (dma->pages) {
+ 		for (i = 0; i < dma->nr_pages; i++)
+-			page_cache_release(dma->pages[i]);
++			put_page(dma->pages[i]);
+ 		kfree(dma->pages);
+ 		dma->pages = NULL;
+ 	}
+@@ -432,18 +435,18 @@
+  * now ...).  Bounce buffers don't work very well for the data rates
+  * video capture has.
+  */
+-static int videobuf_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
++static int videobuf_vm_fault(struct vm_fault *vmf)
+ {
++	struct vm_area_struct *vma = vmf->vma;
+ 	struct page *page;
+ 
+ 	dprintk(3, "fault: fault @ %08lx [vma %08lx-%08lx]\n",
+-		(unsigned long)vmf->virtual_address,
+-		vma->vm_start, vma->vm_end);
++		vmf->address, vma->vm_start, vma->vm_end);
+ 
+ 	page = alloc_page(GFP_USER | __GFP_DMA32);
+ 	if (!page)
+ 		return VM_FAULT_OOM;
+-	clear_user_highpage(page, (unsigned long)vmf->virtual_address);
++	clear_user_highpage(page, vmf->address);
+ 	vmf->page = page;
+ 
+ 	return 0;
+diff -ur ../../media_build_experimental/linux/drivers/staging/media/lirc/lirc_parallel.c ./drivers/staging/media/lirc/lirc_parallel.c
+--- ../../media_build_experimental/linux/drivers/staging/media/lirc/lirc_parallel.c	2017-12-26 15:00:59.179469194 +0100
++++ ./drivers/staging/media/lirc/lirc_parallel.c	2017-12-26 20:02:35.575977443 +0100
+@@ -28,7 +28,7 @@
+ /*** Includes ***/
+ 
+ #include <linux/module.h>
+-#include <linux/sched.h>
++#include <linux/sched/signal.h>
+ #include <linux/errno.h>
+ #include <linux/signal.h>
+ #include <linux/fs.h>
+diff -ur ../../media_build_experimental/linux/drivers/staging/media/lirc/lirc_sir.c ./drivers/staging/media/lirc/lirc_sir.c
+--- ../../media_build_experimental/linux/drivers/staging/media/lirc/lirc_sir.c	2017-12-26 15:00:59.179469194 +0100
++++ ./drivers/staging/media/lirc/lirc_sir.c	2017-12-26 20:02:19.664148927 +0100
+@@ -37,7 +37,7 @@
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/module.h>
+-#include <linux/sched.h>
++#include <linux/sched/signal.h>
+ #include <linux/errno.h>
+ #include <linux/signal.h>
+ #include <linux/fs.h>
+diff -ur ../../media_build_experimental/linux/drivers/staging/media/lirc/lirc_zilog.c ./drivers/staging/media/lirc/lirc_zilog.c
+--- ../../media_build_experimental/linux/drivers/staging/media/lirc/lirc_zilog.c	2015-04-28 05:45:18.000000000 +0200
++++ ./drivers/staging/media/lirc/lirc_zilog.c	2017-12-26 20:01:51.904448586 +0100
+@@ -42,7 +42,7 @@
+ #include <linux/module.h>
+ #include <linux/kmod.h>
+ #include <linux/kernel.h>
+-#include <linux/sched.h>
++#include <linux/sched/signal.h>
+ #include <linux/fs.h>
+ #include <linux/poll.h>
+ #include <linux/string.h>
+diff -ur ../../media_build_experimental/linux/include/media/v4l2-ioctl.h ./include/media/v4l2-ioctl.h
+--- ../../media_build_experimental/linux/include/media/v4l2-ioctl.h	2015-03-04 05:45:10.000000000 +0100
++++ ./include/media/v4l2-ioctl.h	2017-12-26 14:21:57.136916394 +0100
+@@ -12,6 +12,7 @@
+ #include <linux/poll.h>
+ #include <linux/fs.h>
+ #include <linux/mutex.h>
++#include <linux/sched/signal.h>
+ #include <linux/compiler.h> /* need __user */
+ #include <linux/videodev2.h>
+ 
