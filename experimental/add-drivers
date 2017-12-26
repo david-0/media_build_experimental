@@ -22,7 +22,8 @@ apply_patch()
 
 
 cd ../experimental
-hg tip --template "experimental: {node} {desc|firstline}\n" >> ../linux/git_log
+#hg tip --template "experimental: {node} {desc|firstline}\n" >> ../linux/git_log
+git log --pretty=format:'experimental: %H %s' HEAD^..HEAD >> ../linux/git_log
 
 set -ev
 
